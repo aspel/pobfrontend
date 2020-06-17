@@ -10,7 +10,7 @@ all: frontend pob
 
 pob: load_pob luacurl frontend
 	pushd PathOfBuilding; \
-	unzip 'tree*.zip'; \
+	unzip -o 'tree*.zip'; \
 	unzip runtime-win32.zip lua/xml.lua lua/base64.lua lua/sha1.lua; \
 	mv lua/*.lua .; \
 	rmdir lua; \
