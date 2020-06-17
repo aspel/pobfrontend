@@ -21,7 +21,7 @@ frontend:
 	meson -Dbuildtype=release build
 
 load_pob:
-	git clone --depth 1 https://github.com/Openarl/PathOfBuilding.git; \
+	git clone --depth 1 https://github.com/PathOfBuildingCommunity/PathOfBuilding.git; \
 	pushd PathOfBuilding; \
 	rm -rf .git; \
 	popd
