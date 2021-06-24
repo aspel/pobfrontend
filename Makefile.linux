@@ -5,17 +5,15 @@ all: frontend pob
 	pushd build; \
 	ninja; \
 	popd; \
-	mv build/PathOfBuilding PathOfBuilding/; \
+	mv build/PathOfBuilding PathOfBuilding/src; \
 	echo 'Finished'
 
 pob: load_pob luacurl frontend
 	pushd PathOfBuilding; \
 	unzip runtime-win32.zip lua/xml.lua lua/base64.lua lua/sha1.lua; \
-	mv lua/*.lua .; \
+	mv lua/*.lua src/; \
 	rmdir lua; \
-	cp ../lcurl.so .; \
-	mv src/* .; \
-	rmdir src; \
+	cp ../lcurl.so src/; \
 	popd
 
 frontend: 
