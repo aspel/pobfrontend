@@ -24,7 +24,7 @@ jobs:
       - make -f Makefile.darwin tools
       - make -f Makefile.darwin
       - tar -cf - PathOfBuilding.app | xz -c > PathOfBuilding.darwin.tar.xz
-      - tar -tvf PathOfBuilding.linux.tar.xz
+      - tar -tvf PathOfBuilding.darwin.tar.xz
 
   - stage: build Linux        
     os: linux
