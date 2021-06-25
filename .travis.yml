@@ -28,14 +28,6 @@ jobs:
       - |
         if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then 
           ./PathOfBuilding.app/Contents/MacOS/pobWrapper.sh &
-          RESULT=$?
-          if [ $RESULT -eq 0 ]; then
-            echo success
-          else
-            echo failed
-            exit 1
-          fi
-          sleep 10
           screencapture /tmp/sl.png
           export IMG_URL=`curl -L -X POST https://api.imgur.com/3/image -H "Authorization: Client-ID ${IMGUR_CLIENT_ID}" -F image=@/tmp/sl.png | jq '.data | .link' | tr -d '"'`
           curl -X POST -H "Accept: application/vnd.github.v3+json" \
@@ -66,15 +58,8 @@ jobs:
       - tar -cf - -C ${TRAVIS_BUILD_DIR}/PathOfBuilding/src $(ls -A ${TRAVIS_BUILD_DIR}"/PathOfBuilding/src") | xz -c > PathOfBuilding.linux.tar.xz
       - |
         if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then 
-          pushd ${TRAVIS_BUILD_DIR}/PathOfBuilding/
+          pushd ${TRAVIS_BUILD_DIR}/PathOfBuilding/src
           ./PathOfBuilding &
-          RESULT=$?
-          if [ $RESULT -eq 0 ]; then
-            echo success
-          else
-            echo failed
-            exit 1
-          fi
           sleep 10
           xwd -root -silent | convert xwd:- png:/tmp/sl.png
           export IMG_URL=`curl -L -X POST https://api.imgur.com/3/image -H "Authorization: Client-ID ${IMGUR_CLIENT_ID}" -F image=@/tmp/sl.png | jq '.data | .link' | tr -d '"'`
