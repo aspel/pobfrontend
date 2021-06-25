@@ -49,12 +49,13 @@ jobs:
       - sleep 10
       - xwd -root -silent | convert xwd:- png:/tmp/sl.png
       - |
-        export IMG_URL=`curl -L -X POST https://api.imgur.com/3/image -H "Authorization: Client-ID ${IMGUR_CLIENT_ID}" -F image=@/tmp/sl.png | jq '.data | .link'`
+        export IMG_URL=`curl -L -X POST https://api.imgur.com/3/image -H "Authorization: Client-ID ${IMGUR_CLIENT_ID}" -F image=@/tmp/sl.png | jq '.data | .link' | tr -d '"'`
       - |
         curl -X POST -H "Accept: application/vnd.github.v3+json" \
         -H "Authorization: token ${GITHUB_TOKEN}" \
         https://api.github.com/repos/aspel/pobfrontend/issues/${TRAVIS_PULL_REQUEST}/comments \
         -d "{\"body\":\"![Screenshot](${IMG_URL})\n${TRAVIS_PULL_REQUEST_SHA}\"}"
+      - echo $IMG_URL
 
 before_deploy:
   - export TR_TAG="nightly-$(date +'%Y/%m/%d')"
