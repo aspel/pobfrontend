@@ -63,7 +63,7 @@ jobs:
       - make -f Makefile.linux clean
       - make -f Makefile.linux tools
       - make -f Makefile.linux
-      - tar -cf - -C ${TRAVIS_BUILD_DIR}/PathOfBuilding/ $(ls -A ${TRAVIS_BUILD_DIR}"/PathOfBuilding/") | xz -c > PathOfBuilding.linux.tar.xz
+      - tar -cf - -C ${TRAVIS_BUILD_DIR}/PathOfBuilding/src $(ls -A ${TRAVIS_BUILD_DIR}"/PathOfBuilding/src") | xz -c > PathOfBuilding.linux.tar.xz
       - |
         if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then 
           pushd ${TRAVIS_BUILD_DIR}/PathOfBuilding/
