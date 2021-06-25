@@ -35,7 +35,10 @@ luacurl:
 	mv lcurl.so ../lcurl.so; \
 	popd
 
-tools: qt lua zlib meson
+tools: qt lua zlib meson jq
+
+jq:
+	brew install jq
 
 qt:
 	brew install qt5

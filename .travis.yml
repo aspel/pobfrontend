@@ -15,28 +15,26 @@ jobs:
       - CPPFLAGS=-I/usr/local/opt/qt/include
       - PKG_CONFIG_PATH=/usr/local/opt/qt/lib/pkgconfig
     addons:
+      chrome: beta
       homebrew:
         packages:
           - make
           - ninja
-          - jq
-          - xvfb
     script:
       - make -f Makefile.darwin clean
       - make -f Makefile.darwin tools
       - make -f Makefile.darwin
       - tar -cf - PathOfBuilding.app | xz -c > PathOfBuilding.darwin.tar.xz
       - |
-        if [ "${TRAVIS_OS_NAME}" = "osx" ]; then ( sudo Xvfb :99 -ac -screen 0 1024x768x8; echo ok )& fi
         if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then 
-          cd ${TRAVIS_BUILD_DIR}/PathOfBuilding/; ./PathOfBuilding &
+          ./PathOfBuilding.app/Contents/MacOS/pobWrapper.sh &
           sleep 10
           screencapture /tmp/sl.png
           export IMG_URL=`curl -L -X POST https://api.imgur.com/3/image -H "Authorization: Client-ID ${IMGUR_CLIENT_ID}" -F image=@/tmp/sl.png | jq '.data | .link' | tr -d '"'`
           curl -X POST -H "Accept: application/vnd.github.v3+json" \
             -H "Authorization: token ${GITHUB_TOKEN}" \
             https://api.github.com/repos/aspel/pobfrontend/issues/${TRAVIS_PULL_REQUEST}/comments \
-            -d "{\"body\":\"![Screenshot Linux](${IMG_URL})\n${TRAVIS_PULL_REQUEST_SHA} : MacOS\"}"
+            -d "{\"body\":\"![Screenshot MacOS](${IMG_URL})\n${TRAVIS_PULL_REQUEST_SHA} : MacOS\"}"
         fi
       - tar -tvf PathOfBuilding.darwin.tar.xz
 
