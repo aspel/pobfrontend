@@ -48,7 +48,11 @@ jobs:
       - cd ${TRAVIS_BUILD_DIR}/PathOfBuilding/; ./PathOfBuilding &
       - sleep 10
       - xwd -root -silent | convert xwd:- png:/tmp/screenshot-linux.png
-      - curl -F "file=@/tmp/screenshot-linux.png" -F "format=txt" https://fex.cc/up/
+      - export IMG_URL=`curl -F "file=@/tmp/screenshot-linux.png" -F "format=txt" https://fex.cc/up/`
+      - |
+        curl -X POST -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/octocat/hello-world/pulls/42/comments \
+        -d '{"body":"body"}'
+      - env
 
 before_deploy:
   - export TR_TAG="nightly-$(date +'%Y/%m/%d')"
