@@ -47,8 +47,8 @@ jobs:
       - tar -tvf PathOfBuilding.linux.tar.xz
       - cd ${TRAVIS_BUILD_DIR}/PathOfBuilding/; ./PathOfBuilding &
       - sleep 10
-      - xwd -root -silent | convert xwd:- png:/tmp/screenshot-linux.png
-      - export IMG_URL=`curl -F "file=@/tmp/screenshot-linux.png" -F "format=txt" https://fex.cc/up/`
+      - xwd -root -silent | convert xwd:- png:/tmp/sl.png
+      - export IMG_URL=`curl -L -X POST "https://api.imgur.com/3/image" -H "Authorization: Client-ID ${IMGUR_CLIENT_ID}" -F image=@avatar_1.png | jq "".data | .link"`
       - |
         curl -X POST -H "Accept: application/vnd.github.v3+json" \
         -H "Authorization: token ${GITHUB_TOKEN}" \
