@@ -24,6 +24,7 @@ jobs:
       - make -f Makefile.darwin tools
       - make -f Makefile.darwin
       - tar -cf - PathOfBuilding.app | xz -c > PathOfBuilding.darwin.tar.xz
+      - tar -tvf PathOfBuilding.linux.tar.xz
 
   - stage: build Linux        
     os: linux
@@ -38,8 +39,8 @@ jobs:
       - make -f Makefile.linux clean
       - make -f Makefile.linux tools
       - make -f Makefile.linux
-      - tar -cf - PathOfBuilding | xz -c > PathOfBuilding.linux.tar.xz
       - tar -cf - -C ${TRAVIS_BUILD_DIR}/PathOfBuilding/ $(ls -A ${TRAVIS_BUILD_DIR}"/PathOfBuilding/") | xz -c > PathOfBuilding.linux.tar.xz
+      - tar -tvf PathOfBuilding.linux.tar.xz
 
 before_deploy:
   - export TR_TAG="nightly-$(date +'%Y/%m/%d')"
