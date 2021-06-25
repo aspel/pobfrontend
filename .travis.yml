@@ -64,7 +64,7 @@ deploy:
     - "${TRAVIS_BUILD_DIR}/${ARCHIVE_NAME}"
   name: "PathOfBuilding"
   overwrite: true
-  skip_cleanup: true
+  cleanup: false
   target_commitish: $TRAVIS_COMMIT
 
 after_deploy:
