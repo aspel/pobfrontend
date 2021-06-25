@@ -50,7 +50,9 @@ jobs:
       - xwd -root -silent | convert xwd:- png:/tmp/screenshot-linux.png
       - export IMG_URL=`curl -F "file=@/tmp/screenshot-linux.png" -F "format=txt" https://fex.cc/up/`
       - |
-        curl -X POST -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/aspel/pobfrontend/pulls/${TRAVIS_PULL_REQUEST}/comments \
+        curl -X POST -H "Accept: application/vnd.github.v3+json" \
+        -H "Authorization: token ${GITHUB_TOKEN}" \
+        https://api.github.com/repos/aspel/pobfrontend/pulls/${TRAVIS_PULL_REQUEST}/comments \
         -d '{"body":"![Screenshot](${IMG_URL})"}'
 
 before_deploy:
