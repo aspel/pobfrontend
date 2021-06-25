@@ -9,8 +9,6 @@ jobs:
   - stage: build OSX
     os: osx
     language: objective-c
-    services:
-    - xvfb
     env:
       - PATH=/usr/local/opt/qt/bin:$PATH
       - LDFLAGS=-L/usr/local/opt/qt/lib
@@ -21,12 +19,15 @@ jobs:
         packages:
           - make
           - ninja
+          - jq
+          - xvfb
     script:
       - make -f Makefile.darwin clean
       - make -f Makefile.darwin tools
       - make -f Makefile.darwin
       - tar -cf - PathOfBuilding.app | xz -c > PathOfBuilding.darwin.tar.xz
       - |
+        if [ "${TRAVIS_OS_NAME}" = "osx" ]; then ( sudo Xvfb :99 -ac -screen 0 1024x768x8; echo ok )& fi
         if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then 
           cd ${TRAVIS_BUILD_DIR}/PathOfBuilding/; ./PathOfBuilding &
           sleep 10
