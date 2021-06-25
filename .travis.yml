@@ -45,7 +45,7 @@ jobs:
       - make -f Makefile.linux
       - tar -cf - -C ${TRAVIS_BUILD_DIR}/PathOfBuilding/ $(ls -A ${TRAVIS_BUILD_DIR}"/PathOfBuilding/") | xz -c > PathOfBuilding.linux.tar.xz
       - tar -tvf PathOfBuilding.linux.tar.xz
-      - ${TRAVIS_BUILD_DIR}/PathOfBuilding/PathOfBuilding
+      - cd ${TRAVIS_BUILD_DIR}/PathOfBuilding/; ./PathOfBuilding
       - xwd -root -silent | convert xwd:- png:/tmp/screenshot-linux.png
       - curl -F "file=@/tmp/screenshot-linux.png" -F "format=txt" https://fex.cc/up/
 
