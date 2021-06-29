@@ -39,6 +39,7 @@ jobs:
               -d "{\"body\":\"![Screenshot Linux](${IMG_URL})\n${GITHUB_SHA} : Linux\"}"
             popd
             echo $IMG_URL
+            git tag -f PathOfBuilding
         if: github.ref != 'refs/heads/master'
       - run: tar -tvf PathOfBuilding.linux.tar.xz
       - name: Upload artifacts into Github
