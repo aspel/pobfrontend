@@ -1,0 +1,52 @@
+name: CI
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    if: github.ref != 'refs/heads/master'
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+      - run: sudo apt-get install xvfb build-essential ninja-build
+      - run: make -f Makefile.linux clean
+      - run: make -f Makefile.linux tools
+      - run: make -f Makefile.linux
+      - run: tar -cf - -C ${TRAVIS_BUILD_DIR}/PathOfBuilding/src $(ls -A ${TRAVIS_BUILD_DIR}"/PathOfBuilding/src") | xz -c > PathOfBuilding.linux.tar.xz
+      - run: |
+        if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then 
+          pushd ${TRAVIS_BUILD_DIR}/PathOfBuilding/src
+          xvfb-run --auto-servernum ./PathOfBuilding &
+          sleep 10
+          xwd -root -silent | convert xwd:- png:/tmp/sl.png
+          export IMG_URL=`curl -L -X POST https://api.imgur.com/3/image -H "Authorization: Client-ID ${IMGUR_CLIENT_ID}" -F image=@/tmp/sl.png | jq '.data | .link' | tr -d '"'`
+          curl -X POST -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            https://api.github.com/repos/aspel/pobfrontend/issues/${TRAVIS_PULL_REQUEST}/comments \
+            -d "{\"body\":\"![Screenshot Linux](${IMG_URL})\n${TRAVIS_PULL_REQUEST_SHA} : Linux\"}"
+          popd
+        fi
+      - run: tar -tvf PathOfBuilding.linux.tar.xz
+      - run: echo $IMG_URL
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    env:
+      VSCE_PAT: ${{ secrets.VS_TOKEN }}
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+          check-latest: true
+      - run: git config --global user.email "lip@lip.net.ua"
+      - run: git config --global user.name "aspel"
+      - run: npm version patch -m "Upgrade to [%s]"
+      - run: npm install
+      - run: npm install -g vsce
+      - run: vsce package
+      - run: vsce publish
+      - run: git push
