@@ -59,7 +59,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           allowUpdates: true
           tag: PathOfBuilding
-          body: "body.md"
+          bodyFile: "body.md"
           commit: ${{ env.GITHUB_SHA }}
         if: github.ref != 'refs/heads/master'
   build-macos:
