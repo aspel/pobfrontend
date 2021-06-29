@@ -1,7 +1,9 @@
 #include <QCache>
+#include <QDateTime>
 #include <QDir>
 #include <QOpenGLWindow>
 #include <QPainter>
+#include <QTimer>
 #include <memory>
 
 #include "main.h"
@@ -30,12 +32,16 @@ public:
 //        theformat.setAlphaBufferSize(8);
 //        std::cout << theformat.hasAlpha() << std::endl;
 //        setFormat(theformat);
+        baseTime = QDateTime::currentDateTime().toMSecsSinceEpoch();
         scriptPath = QDir::currentPath();
         scriptWorkDir = QDir::currentPath();
         basePath = QDir::currentPath();
         userPath = QDir::currentPath();
 
         fontFudge = 0;
+
+        connect(&updateTimer, &QTimer::timeout, this, QOverload<>::of(&POBWindow::triggerUpdate));
+        updateTimer.start(100);
     }
 
 //    POBWindow() : QOpenGLWindow() {
@@ -64,9 +70,10 @@ public:
     void SetDrawSubLayer(int subLayer) {
         SetDrawLayer(curLayer, subLayer);
     }
-    void AppendCmd(std::shared_ptr<Cmd> cmd);
+    void AppendCmd(std::unique_ptr<Cmd> cmd);
     void DrawColor(const float col[4] = NULL);
     void DrawColor(uint32_t col);
+    qint64 baseTime;
     QString scriptPath;
     QString scriptWorkDir;
     QString basePath;
@@ -79,8 +86,10 @@ public:
     bool isDrawing;
     QString fontName;
     float drawColor[4];
-    QMap<QPair<int, int>, QList<std::shared_ptr<Cmd>>> layers;
+    std::map<QPair<int, int>, std::vector<std::unique_ptr<Cmd>>> layers;
     QList<std::shared_ptr<SubScript>> subScriptList;
     std::shared_ptr<QOpenGLTexture> white;
     QCache<QString, std::shared_ptr<QOpenGLTexture>> stringCache;
+    QTimer updateTimer;
+    void triggerUpdate();
 };

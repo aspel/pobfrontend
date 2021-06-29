@@ -1,6 +1,5 @@
 #include <QClipboard>
 #include <QColor>
-#include <QDateTime>
 #include <QFontDatabase>
 #include <QKeyEvent>
 #include <QApplication>
@@ -37,6 +36,12 @@ void pushCallback(const char* name) {
     lua_insert(L, -2);
 }
 
+void POBWindow::triggerUpdate() {
+    if (isActive()) {
+        update();
+    }
+}
+
 void POBWindow::initializeGL() {
     QImage wimg{1, 1, QImage::Format_Mono};
     wimg.fill(1);
@@ -65,20 +70,15 @@ void POBWindow::paintGL() {
     glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
     glColor4f(0, 0, 0, 0);
 
-    pushCallback("OnFrame");
-    int result = lua_pcall(L, 1, 0, 0);
-    if (result != 0) {
-        lua_error(L);
+    for (auto& layer : layers) {
+        layer.second.clear();
     }
-
-    // Hack: PoB doesn't recalculate stats until the frame _after_ some changes (e.g. config). Just call OnFrame twice.
-    layers.clear();
     dscount = 0;
     curLayer = 0;
     curSubLayer = 0;
 
     pushCallback("OnFrame");
-    result = lua_pcall(L, 1, 0, 0);
+    int result = lua_pcall(L, 1, 0, 0);
     if (result != 0) {
         lua_error(L);
     }
@@ -87,8 +87,8 @@ void POBWindow::paintGL() {
         pobwindow->stringCache.setMaxCost(dscount);
     }
 
-    for (auto layer : layers) {
-        for (auto cmd : layer) {
+    for (auto& layer : layers) {
+        for (auto& cmd : layer.second) {
             cmd->execute();
         }
     }
@@ -109,8 +109,6 @@ void POBWindow::subScriptFinished() {
     if (clean) {
         subScriptList.clear();
     }
-
-    update();
 }
 
 void POBWindow::mouseMoveEvent(QMouseEvent *event) {
@@ -125,7 +123,7 @@ void pushMouseString(QMouseEvent *event) {
     case Qt::RightButton:
         lua_pushstring(L, "RIGHTBUTTON");
         break;
-    case Qt::MidButton:
+    case Qt::MiddleButton:
         lua_pushstring(L, "MIDDLEBUTTON");
         break;
     default:
@@ -141,7 +139,6 @@ void POBWindow::mousePressEvent(QMouseEvent *event) {
     if (result != 0) {
         lua_error(L);
     }
-    update();
 }
 
 void POBWindow::mouseReleaseEvent(QMouseEvent *event) {
@@ -151,7 +148,6 @@ void POBWindow::mouseReleaseEvent(QMouseEvent *event) {
     if (result != 0) {
         lua_error(L);
     }
-    update();
 }
 
 void POBWindow::mouseDoubleClickEvent(QMouseEvent *event) {
@@ -162,7 +158,6 @@ void POBWindow::mouseDoubleClickEvent(QMouseEvent *event) {
     if (result != 0) {
         lua_error(L);
     }
-    update();
 }
 
 void POBWindow::wheelEvent(QWheelEvent *event) {
@@ -179,7 +174,6 @@ void POBWindow::wheelEvent(QWheelEvent *event) {
     if (result != 0) {
         lua_error(L);
     }
-    update();
 }
 
 bool pushKeyString(int keycode) {
@@ -224,6 +218,9 @@ bool pushKeyString(int keycode) {
     case Qt::Key_PageDown:
         lua_pushstring(L, "PAGEDOWN");
         break;
+    case Qt::Key_F6:
+        lua_pushstring(L, "F6");
+        break;
     default:
         return false;
     }
@@ -256,7 +253,6 @@ void POBWindow::keyPressEvent(QKeyEvent *event) {
     if (result != 0) {
         lua_error(L);
     }
-    update();
 }
 
 void POBWindow::keyReleaseEvent(QKeyEvent *event) {
@@ -269,7 +265,6 @@ void POBWindow::keyReleaseEvent(QKeyEvent *event) {
     if (result != 0) {
         lua_error(L);
     }
-    update();
 }
 
 void POBWindow::LAssert(lua_State* L, int cond, const char* fmt, ...) {
@@ -304,16 +299,11 @@ void POBWindow::SetDrawLayer(int layer, int subLayer) {
 
     curLayer = layer;
     curSubLayer = subLayer;
-    QPair<int, int> key{layer, subLayer};
-    if (layers.contains(key)) {
-        return;
-    }
-    layers[key] = QList<std::shared_ptr<Cmd>>{};
 }
 
 
-void POBWindow::AppendCmd(std::shared_ptr<Cmd> cmd) {
-    layers[{curLayer, curSubLayer}].append(cmd);
+void POBWindow::AppendCmd(std::unique_ptr<Cmd> cmd) {
+    layers[{curLayer, curSubLayer}].emplace_back(std::move(cmd));
 }
 
 void POBWindow::DrawColor(const float col[4]) {
@@ -328,7 +318,7 @@ void POBWindow::DrawColor(const float col[4]) {
         drawColor[2] = 1.0f;
         drawColor[3] = 1.0f;
     }
-    AppendCmd(std::shared_ptr<Cmd>{new ColorCmd(drawColor)});
+    AppendCmd(std::make_unique<ColorCmd>(drawColor));
 }
 
 void POBWindow::DrawColor(uint32_t col) {
@@ -631,9 +621,9 @@ static int l_SetViewport(lua_State* L)
         for (int i = 1; i <= 4; i++) {
             pobwindow->LAssert(L, lua_isnumber(L, i), "SetViewport() argument %d: expected number, got %t", i, i);
         }
-        pobwindow->AppendCmd(std::shared_ptr<Cmd>(new ViewportCmd((int)lua_tointeger(L, 1), (int)lua_tointeger(L, 2), (int)lua_tointeger(L, 3), (int)lua_tointeger(L, 4))));
+        pobwindow->AppendCmd(std::make_unique<ViewportCmd>((int)lua_tointeger(L, 1), (int)lua_tointeger(L, 2), (int)lua_tointeger(L, 3), (int)lua_tointeger(L, 4)));
     } else {
-        pobwindow->AppendCmd(std::shared_ptr<Cmd>(new ViewportCmd(0, 0, pobwindow->width, pobwindow->height)));
+        pobwindow->AppendCmd(std::make_unique<ViewportCmd>(0, 0, pobwindow->width, pobwindow->height));
     }
     return 0;
 }
@@ -691,13 +681,13 @@ static int l_DrawImage(lua_State* L)
             pobwindow->LAssert(L, lua_isnumber(L, i), "DrawImage() argument %d: expected number, got %t", i, i);
             arg[i-2] = (float)lua_tonumber(L, i);
         }
-        pobwindow->AppendCmd(std::shared_ptr<Cmd>(new DrawImageCmd(hnd, arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7])));
+        pobwindow->AppendCmd(std::make_unique<DrawImageCmd>(hnd, arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7]));
     } else {
         for (int i = 2; i <= 5; i++) {
             pobwindow->LAssert(L, lua_isnumber(L, i), "DrawImage() argument %d: expected number, got %t", i, i);
             arg[i-2] = (float)lua_tonumber(L, i);
         }
-        pobwindow->AppendCmd(std::shared_ptr<Cmd>(new DrawImageCmd(hnd, arg[0], arg[1], arg[2], arg[3])));
+        pobwindow->AppendCmd(std::make_unique<DrawImageCmd>(hnd, arg[0], arg[1], arg[2], arg[3]));
     }
     return 0;
 }
@@ -742,20 +732,20 @@ static int l_DrawImageQuad(lua_State* L)
             pobwindow->LAssert(L, lua_isnumber(L, i), "DrawImageQuad() argument %d: expected number, got %t", i, i);
             arg[i-2] = (float)lua_tonumber(L, i);
         }
-        pobwindow->AppendCmd(std::shared_ptr<Cmd>(new DrawImageQuadCmd(hnd, arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7], arg[8], arg[9], arg[10], arg[11], arg[12], arg[13], arg[14], arg[15])));
+        pobwindow->AppendCmd(std::make_unique<DrawImageQuadCmd>(hnd, arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7], arg[8], arg[9], arg[10], arg[11], arg[12], arg[13], arg[14], arg[15]));
     } else {
         for (int i = 2; i <= 9; i++) {
             pobwindow->LAssert(L, lua_isnumber(L, i), "DrawImageQuad() argument %d: expected number, got %t", i, i);
             arg[i-2] = (float)lua_tonumber(L, i);
         }
-        pobwindow->AppendCmd(std::shared_ptr<Cmd>(new DrawImageQuadCmd(hnd, arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7])));
+        pobwindow->AppendCmd(std::make_unique<DrawImageQuadCmd>(hnd, arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7]));
     }
     return 0;
 }
 
 DrawStringCmd::DrawStringCmd(float X, float Y, int Align, int Size, int Font, const char *Text) : text(Text) {
     dscount++;
-    if (text[0] == '^') {
+    if (text.size() >= 2 && text[0] == '^') {
         switch(text[1].toLatin1()) {
         case '0':
             setCol(0.0f, 0.0f, 0.0f);
@@ -896,10 +886,10 @@ static int l_DrawString(lua_State* L)
     pobwindow->LAssert(L, lua_isstring(L, 6), "DrawString() argument 6: expected string, got %t", 6);
     static const char* alignMap[6] = { "LEFT", "CENTER", "RIGHT", "CENTER_X", "RIGHT_X", nullptr };
     static const char* fontMap[4] = { "FIXED", "VAR", "VAR BOLD", nullptr };
-    pobwindow->AppendCmd(std::shared_ptr<Cmd>(new DrawStringCmd(
+    pobwindow->AppendCmd(std::make_unique<DrawStringCmd>(
         (float)lua_tonumber(L, 1), (float)lua_tonumber(L, 2), luaL_checkoption(L, 3, "LEFT", alignMap), 
         (int)lua_tointeger(L, 4), luaL_checkoption(L, 5, "FIXED", fontMap), lua_tostring(L, 6)
-                                                  )));
+                                                  ));
     return 0;
 }
 
@@ -1211,10 +1201,12 @@ static int l_Deflate(lua_State* L)
     deflateEnd(&z);
     if (err == Z_STREAM_END) {
         lua_pushlstring(L, (const char*)out, z.total_out);
+        delete[] out;
         return 1;
     } else {
         lua_pushnil(L);
         lua_pushstring(L, zError(err));
+        delete[] out;
         return 2;
     }
 }
@@ -1246,7 +1238,7 @@ static int l_Inflate(lua_State* L)
                 out = newOut;
             } else {
                 // PANIC
-                delete out;
+                delete[] out;
                 return 0;
             }
             z.next_out = out + outSz;
@@ -1257,18 +1249,20 @@ static int l_Inflate(lua_State* L)
     inflateEnd(&z);
     if (err == Z_STREAM_END) {
         lua_pushlstring(L, (const char*)out, z.total_out);
+        delete[] out;
         return 1;
     } else {
         lua_pushnil(L);
         lua_pushstring(L, zError(err));
+        delete[] out;
         return 2;
     }
 }
 
 static int l_GetTime(lua_State* L)
 {
-    qint64 ms = QDateTime::currentDateTime().toMSecsSinceEpoch();
-    lua_pushinteger(L, ms / 1000);
+    qint64 ms = QDateTime::currentDateTime().toMSecsSinceEpoch() - pobwindow->baseTime;
+    lua_pushinteger(L, ms);
     return 1;
 }
 
@@ -1639,6 +1633,7 @@ int main(int argc, char **argv)
         int ff = args[1].toInt(&ok);
         if (ok) {
             pobwindow->fontFudge = ff;
+            args.removeAt(1); // Remove our hacky font factor from the arglist passed on to the script
         }
     }
 
@@ -1752,12 +1747,13 @@ int main(int argc, char **argv)
     lua_pushcfunction(L, l_Exit);
     lua_setfield(L, -2, "exit");
     lua_pop(L, 1);		// Pop 'os' table
-    lua_newtable(L);
-    for (int i = 0; i < argc; i++) {
-         lua_pushstring(L, argv[i]);
-         lua_rawseti(L, -2, i);
+    lua_createtable(L, args.size() - 1, 1);
+    for (int i = 0; i < args.size(); i++) {
+        lua_pushstring(L, args[i].toStdString().c_str());
+        lua_rawseti(L, -2, i);
     }
     lua_setglobal(L, "arg");
+
     int result = luaL_dofile(L, "Launch.lua");
     if (result != 0) {
         lua_error(L);
