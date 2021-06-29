@@ -10,7 +10,7 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
-      - run: sudo apt-get install xvfb build-essential ninja-build x11-apps imagemagick
+      - run: sudo apt-get install xvfb build-essential ninja-build x11-apps imagemagick libcurl-dev
       - run: make -f Makefile.linux clean
       - run: make -f Makefile.linux tools
       - run: make -f Makefile.linux
