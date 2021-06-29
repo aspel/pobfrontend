@@ -12,6 +12,7 @@ jobs:
         run: |
           time=nightly-$(date +'%Y/%m/%d')
           echo "::set-output name=time::$time"
+          echo $time > body.md
       - uses: actions/checkout@v2
       - run: sudo apt-get install xvfb build-essential ninja-build x11-apps imagemagick libcurl4-openssl-dev
       - run: make -f Makefile.linux clean
@@ -41,7 +42,7 @@ jobs:
             echo $IMG_URL
         if: github.ref != 'refs/heads/master'
       - run: tar -tvf PathOfBuilding.linux.tar.xz
-      - name: Update tag
+      - name: Update release tag
         run: |
           git config --local user.name "${GITHUB_ACTOR}"
           git config --local user.email "aspellip@gmail.com"
@@ -50,14 +51,14 @@ jobs:
           git push -f gh PathOfBuilding
           git remote remove gh
         if: github.ref != 'refs/heads/master'
-      - name: Upload artifacts into Github
+      - name: Upload Linux artifacts into Github
         uses: ncipollo/release-action@v1
         with:
           artifacts: "PathOfBuilding.linux.tar.xz"
           token: ${{ secrets.GITHUB_TOKEN }}
           allowUpdates: true
           tag: PathOfBuilding
-          body: "${{ steps.time.output.time }}"
+          bodyFile: "body.md"
           commit: ${{ env.GITHUB_SHA }}
         if: github.ref != 'refs/heads/master'
   build-macos:
