@@ -40,10 +40,10 @@ jobs:
       - name: Upload artifacts into Github
         uses: ncipollo/release-action@v1
         with:
-          artifact: "PathOfBuilding.linux.tar.xz"
+          artifacts: "PathOfBuilding.linux.tar.xz"
           token: ${{ secrets.GITHUB_TOKEN }}
           allowUpdates: true
-        if: github.ref == 'refs/heads/master'
+        if: github.ref != 'refs/heads/master'
   build-macos:
     runs-on: macos-latest
     steps:
