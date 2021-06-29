@@ -21,9 +21,10 @@ jobs:
           IMGUR_CLIENT_ID: ${{ secrets.IMGUR_CLIENT_ID }}
         run: |
             pushd ${GITHUB_WORKSPACE}/PathOfBuilding/src
-            xvfb-run --auto-servernum ./PathOfBuilding &
+            Xvfb :1 -screen 5 1024x768x16 &
+            ./PathOfBuilding &
             sleep 10
-            xwd -root -silent -display :99.0 | convert xwd:- png:/tmp/sl.png
+            xwd -root -silent -display :1 | convert xwd:- png:/tmp/sl.png
             export IMG_URL=`curl -L -X POST https://api.imgur.com/3/image -H "Authorization: Client-ID ${IMGUR_CLIENT_ID}" -F image=@/tmp/sl.png | jq '.data | .link' | tr -d '"'`
             pull_number=$(jq --raw-output .pull_request.number "$GITHUB_EVENT_PATH")
             curl -X POST -H "Accept: application/vnd.github.v3+json" \
