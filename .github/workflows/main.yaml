@@ -6,7 +6,6 @@ on:
 jobs:
   build-linux:
     runs-on: ubuntu-latest
-    if: github.ref != 'refs/heads/master'
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
@@ -23,7 +22,7 @@ jobs:
           DISPLAY: :1
         run: |
             pushd ${GITHUB_WORKSPACE}/PathOfBuilding/src
-            Xvfb :1 -screen 0 1024x768x16 &
+            Xvfb :1 -screen 0 1024x768x24 &
             ./PathOfBuilding &
             sleep 10
             xwd -root -silent -display :1 | convert xwd:- png:/tmp/sl.png
@@ -34,25 +33,52 @@ jobs:
               https://api.github.com/repos/aspel/pobfrontend/issues/${pull_number}/comments \
               -d "{\"body\":\"![Screenshot Linux](${IMG_URL})\n${GITHUB_SHA} : Linux\"}"
             popd
+            echo $IMG_URL
       - run: tar -tvf PathOfBuilding.linux.tar.xz
-      - run: echo $IMG_URL
-  deploy:
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+      - name: Upload artifacts into Github
+        uses: ncipollo/release-action@v1
+        with:
+          artifact: "PathOfBuilding.linux.tar.xz"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          allowUpdates: true
+        if: github.ref == 'refs/heads/master'
+  build-macos:
+    runs-on: macos-latest
     env:
-      VSCE_PAT: ${{ secrets.VS_TOKEN }}
+      PATH: /usr/local/opt/qt/bin:$PATH
+      LDFLAGS: -L/usr/local/opt/qt/lib
+      CPPFLAGS: -I/usr/local/opt/qt/include
+      PKG_CONFIG_PATH: /usr/local/opt/qt/lib/pkgconfig
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
+      - run: brew install make ninja
+      - run: make -f Makefile.darwin clean
+      - run: make -f Makefile.darwin tools
+      - run: make -f Makefile.darwin
+      - name: Package tar.xz archive
+        run: tar -cf - PathOfBuilding.app | xz -c > PathOfBuilding.darwin.tar.xz
+      - name: Cheking GUI 
+        env:
+          IMGUR_CLIENT_ID: ${{ secrets.IMGUR_CLIENT_ID }}
+          GIT_TOKEN: ${{ secrets.GIT_TOKEN }} 
+          DISPLAY: :1
+        run: |
+            ./PathOfBuilding.app/Contents/MacOS/pobWrapper.sh &
+            screencapture /tmp/sl.png
+            export IMG_URL=`curl -L -X POST https://api.imgur.com/3/image -H "Authorization: Client-ID ${IMGUR_CLIENT_ID}" -F image=@/tmp/sl.png | jq '.data | .link' | tr -d '"'`
+            pull_number=$(jq --raw-output .pull_request.number "$GITHUB_EVENT_PATH")
+            curl -X POST -H "Accept: application/vnd.github.v3+json" \
+              -H "Authorization: token ${GIT_TOKEN}" \
+              https://api.github.com/repos/aspel/pobfrontend/issues/${pull_number}/comments \
+              -d "{\"body\":\"![Screenshot MacOS](${IMG_URL})\n${GITHUB_SHA} : Linux\"}"
+            popd
+            echo $IMG_URL
+      - run: tar -tvf PathOfBuilding.darwin.tar.xz
+      - name: Upload artifacts into Github
+        uses: ncipollo/release-action@v1
         with:
-          node-version: '14'
-          check-latest: true
-      - run: git config --global user.email "lip@lip.net.ua"
-      - run: git config --global user.name "aspel"
-      - run: npm version patch -m "Upgrade to [%s]"
-      - run: npm install
-      - run: npm install -g vsce
-      - run: vsce package
-      - run: vsce publish
-      - run: git push
+          artifact: "tar -tvf PathOfBuilding.darwin.tar.xz"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          allowUpdates: true
+        if: github.ref == 'refs/heads/master'
