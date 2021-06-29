@@ -19,9 +19,11 @@ jobs:
       - name: Cheking GUI 
         env:
           IMGUR_CLIENT_ID: ${{ secrets.IMGUR_CLIENT_ID }}
+          GIT_TOKEN: ${{ secrets.GIT_TOKEN }} 
+          DISPLAY: :1
         run: |
             pushd ${GITHUB_WORKSPACE}/PathOfBuilding/src
-            Xvfb :1 -screen 5 1024x768x16 &
+            Xvfb :1 -screen 0 1024x768x16 &
             ./PathOfBuilding &
             sleep 10
             xwd -root -silent -display :1 | convert xwd:- png:/tmp/sl.png
