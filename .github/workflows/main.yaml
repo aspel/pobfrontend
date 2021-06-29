@@ -64,6 +64,10 @@ jobs:
   build-macos:
     runs-on: macos-latest
     steps:
+      - id: time
+        run: |
+          time=nightly-$(date +'%Y/%m/%d')
+          echo "::set-output name=time::$time"
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
       - run: brew install make ninja
@@ -96,5 +100,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           allowUpdates: true
           tag: PathOfBuilding
+          body: "${{steps.time.outputs.time}}"
         if: github.ref == 'refs/heads/master'
   
