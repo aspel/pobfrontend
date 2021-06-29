@@ -23,6 +23,7 @@ jobs:
         run: |
             pushd ${GITHUB_WORKSPACE}/PathOfBuilding/src
             Xvfb :10 -screen 0 1024x768x24 &
+            sleep 10
             ./PathOfBuilding &
             sleep 10
             xwd -root -silent -display :10 | convert xwd:- png:/tmp/sl.png
