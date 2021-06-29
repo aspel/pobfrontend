@@ -57,7 +57,6 @@ jobs:
         env:
           IMGUR_CLIENT_ID: ${{ secrets.IMGUR_CLIENT_ID }}
           GIT_TOKEN: ${{ secrets.GIT_TOKEN }} 
-          DISPLAY: :1
         run: |
             ./PathOfBuilding.app/Contents/MacOS/pobWrapper.sh &
             screencapture /tmp/sl.png
@@ -66,7 +65,7 @@ jobs:
             curl -X POST -H "Accept: application/vnd.github.v3+json" \
               -H "Authorization: token ${GIT_TOKEN}" \
               https://api.github.com/repos/aspel/pobfrontend/issues/${pull_number}/comments \
-              -d "{\"body\":\"![Screenshot MacOS](${IMG_URL})\n${GITHUB_SHA} : Linux\"}"
+              -d "{\"body\":\"![Screenshot MacOS](${IMG_URL})\n${GITHUB_SHA} : MacOS\"}"
             popd
             echo $IMG_URL
       - run: tar -tvf PathOfBuilding.darwin.tar.xz
