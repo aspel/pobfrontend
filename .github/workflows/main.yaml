@@ -10,7 +10,7 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - id: time
         run: |
-          $time=nightly-$(date +'%Y/%m/%d')
+          time=nightly-$(date +'%Y/%m/%d')
           echo "::set-output name=time::$time"
       - uses: actions/checkout@v2
       - run: sudo apt-get install xvfb build-essential ninja-build x11-apps imagemagick libcurl4-openssl-dev
