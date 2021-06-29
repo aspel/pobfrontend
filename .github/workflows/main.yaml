@@ -20,7 +20,7 @@ jobs:
         env:
           IMGUR_CLIENT_ID: ${{ secrets.IMGUR_CLIENT_ID }}
         run: |
-            pushd ${TRAVIS_BUILD_DIR}/PathOfBuilding/src
+            pushd ${GITHUB_WORKSPACE}/PathOfBuilding/src
             xvfb-run --auto-servernum ./PathOfBuilding &
             sleep 10
             xwd -root -silent | convert xwd:- png:/tmp/sl.png
