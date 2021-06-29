@@ -1,4 +1,5 @@
 DIR := ${CURDIR}
+export PATH := /usr/local/opt/qt/bin:$(PATH)
 
 all: frontend pob 
 	pushd build; \
