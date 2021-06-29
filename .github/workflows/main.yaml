@@ -39,9 +39,17 @@ jobs:
               -d "{\"body\":\"![Screenshot Linux](${IMG_URL})\n${GITHUB_SHA} : Linux\"}"
             popd
             echo $IMG_URL
-            git tag -f PathOfBuilding
         if: github.ref != 'refs/heads/master'
       - run: tar -tvf PathOfBuilding.linux.tar.xz
+      - name: Upfate tag
+        run: |
+          git config --local user.name "aspel"
+          git config --local user.email "aspellip@gmail.com"
+          git tag -f PathOfBuilding
+          git remote add gh https://${{env.GITHUB_ACTOR}}:${GIT_TOKEN}@github.com/${{env.GITHUB_REPOSITORY}}.git
+          git push -f gh PathOfBuilding
+          git remote remove gh
+        if: github.ref != 'refs/heads/master'
       - name: Upload artifacts into Github
         uses: ncipollo/release-action@v1
         with:
