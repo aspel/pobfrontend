@@ -8,6 +8,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - id: time
+        run: |
+          $time=nightly-$(date +'%Y/%m/%d')
+          echo "::set-output name=time::$time"
       - uses: actions/checkout@v2
       - run: sudo apt-get install xvfb build-essential ninja-build x11-apps imagemagick libcurl4-openssl-dev
       - run: make -f Makefile.linux clean
@@ -44,6 +48,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           allowUpdates: true
           tag: PathOfBuilding
+          body: {{ steps.time.output.time }}
         if: github.ref != 'refs/heads/master'
   build-macos:
     runs-on: macos-latest
