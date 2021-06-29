@@ -3,6 +3,8 @@ on:
   push:
     branches: [ master ]
   pull_request:
+  schedule:
+    - cron:  '30 13 * * 5'
 jobs:
   build-linux:
     runs-on: ubuntu-latest
@@ -49,7 +51,7 @@ jobs:
           git remote add gh https://$GITHUB_ACTOR:$GIT_TOKEN@github.com/$GITHUB_REPOSITORY.git
           git push -f gh PathOfBuilding
           git remote remove gh
-        if: github.ref != 'refs/heads/master'
+        if: github.ref == 'refs/heads/master'
       - name: Upload Linux artifacts into Github
         uses: ncipollo/release-action@v1
         with:
@@ -58,7 +60,7 @@ jobs:
           allowUpdates: true
           tag: PathOfBuilding
           body: "${{steps.time.outputs.time}}"
-        if: github.ref != 'refs/heads/master'
+        if: github.ref == 'refs/heads/master'
   build-macos:
     runs-on: macos-latest
     steps:
