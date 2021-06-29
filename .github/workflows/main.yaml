@@ -43,6 +43,7 @@ jobs:
           artifacts: "PathOfBuilding.linux.tar.xz"
           token: ${{ secrets.GITHUB_TOKEN }}
           allowUpdates: true
+          tag: PathOfBuilding
         if: github.ref != 'refs/heads/master'
   build-macos:
     runs-on: macos-latest
