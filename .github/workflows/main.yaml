@@ -48,7 +48,8 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           allowUpdates: true
           tag: PathOfBuilding
-          body: ${{ steps.time.output.time }}
+          body: "${{ steps.time.output.time }}"
+          commit: ${{ env.GITHUB_SHA }}
         if: github.ref != 'refs/heads/master'
   build-macos:
     runs-on: macos-latest
