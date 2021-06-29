@@ -50,7 +50,7 @@ jobs:
           tag: PathOfBuilding
           body: "${{ steps.time.output.time }}"
           commit: ${{ env.GITHUB_SHA }}
-        if: github.ref != 'refs/heads/master'
+        if: github.ref == 'refs/heads/master'
   build-macos:
     runs-on: macos-latest
     steps:
@@ -79,10 +79,12 @@ jobs:
             echo $IMG_URL
         if: github.ref != 'refs/heads/master'
       - run: tar -tvf PathOfBuilding.darwin.tar.xz
-      - name: Upload artifacts into Github
+      - name: Upload MacOS artifacts into Github
         uses: ncipollo/release-action@v1
         with:
-          artifact: "tar -tvf PathOfBuilding.darwin.tar.xz"
+          artifacts: "PathOfBuilding.darwin.tar.xz"
           token: ${{ secrets.GITHUB_TOKEN }}
           allowUpdates: true
+          tag: PathOfBuilding
         if: github.ref == 'refs/heads/master'
+  
