@@ -50,6 +50,7 @@ jobs:
           git remote add gh https://$GITHUB_ACTOR:$GIT_TOKEN@github.com/$GITHUB_REPOSITORY.git
           git push -f gh PathOfBuilding
           git remote remove gh
+          echo ${{steps.time.output.time}} > body.md
         if: github.ref != 'refs/heads/master'
       - name: Upload Linux artifacts into Github
         uses: ncipollo/release-action@v1
@@ -58,7 +59,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           allowUpdates: true
           tag: PathOfBuilding
-          bodyFile: "body.md"
+          body: "body.md"
           commit: ${{ env.GITHUB_SHA }}
         if: github.ref != 'refs/heads/master'
   build-macos:
