@@ -13,8 +13,8 @@ jobs:
       - id: time
         run: |
           time=nightly-$(date +'%Y/%m/%d')
-          echo "::set-output name=time::$time"
-      - uses: actions/checkout@v2
+          echo "time=${time}" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@v4
       - run: sudo apt-get install xvfb build-essential ninja-build x11-apps imagemagick libcurl4-openssl-dev
       - run: make -f Makefile.linux clean
       - run: make -f Makefile.linux tools
@@ -67,9 +67,9 @@ jobs:
       - id: time
         run: |
           time=nightly-$(date +'%Y/%m/%d')
-          echo "::set-output name=time::$time"
+          echo "time=${time}" >> $GITHUB_OUTPUT
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - run: brew install make ninja
       - run: make -f Makefile.darwin clean
       - run: make -f Makefile.darwin tools
