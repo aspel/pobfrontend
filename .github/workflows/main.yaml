@@ -6,8 +6,8 @@ on:
   schedule:
     - cron:  '30 13 * * 5'
 jobs:
-  build-linux:
-    runs-on: ubuntu-latest
+  build-linux-amd64:
+    runs-on: ubuntu-22.04
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - id: time
@@ -15,21 +15,19 @@ jobs:
           time=nightly-$(date +'%Y/%m/%d')
           echo "time=${time}" >> $GITHUB_OUTPUT
       - uses: actions/checkout@v4
-      - run: sudo apt-get install xvfb build-essential ninja-build x11-apps imagemagick libcurl4-openssl-dev
-      - run: make -f Makefile.linux clean
-      - run: make -f Makefile.linux tools
-      - run: make -f Makefile.linux
+      - run: make
       - name: Package tar.xz archive
-        run: tar -cf - -C ${GITHUB_WORKSPACE}/PathOfBuilding/src $(ls -A ${GITHUB_WORKSPACE}"/PathOfBuilding/src") | xz -c > PathOfBuilding.linux.tar.xz
+        run: tar -cf - -C ${GITHUB_WORKSPACE}/PathOfBuilding $(ls -A ${GITHUB_WORKSPACE}"/PathOfBuilding") | xz -c > PathOfBuilding.linux.amd64.tar.xz
       - name: Cheking GUI 
         env:
           IMGUR_CLIENT_ID: ${{ secrets.IMGUR_CLIENT_ID }}
           GIT_TOKEN: ${{ secrets.GIT_TOKEN }} 
           DISPLAY: :10
+        if: github.ref != 'refs/heads/master'
         run: |
-            pushd ${GITHUB_WORKSPACE}/PathOfBuilding/src
+            pushd ${GITHUB_WORKSPACE}/PathOfBuilding
             Xvfb :10 -screen 0 1024x768x24 &
-            sleep 10
+            sleep 15
             ./PathOfBuilding &
             sleep 10
             xwd -root -silent -display :10 | convert xwd:- png:/tmp/sl.png
@@ -41,9 +39,9 @@ jobs:
               -d "{\"body\":\"![Screenshot Linux](${IMG_URL})\n${GITHUB_SHA} : Linux\"}"
             popd
             echo $IMG_URL
-        if: github.ref != 'refs/heads/master'
-      - run: tar -tvf PathOfBuilding.linux.tar.xz
+      - run: tar -tvf PathOfBuilding.linux.amd64.tar.xz
       - name: Update release tag
+        if: github.ref == 'refs/heads/master'
         run: |
           git config --local user.name "${GITHUB_ACTOR}"
           git config --local user.email "aspellip@gmail.com"
@@ -51,18 +49,17 @@ jobs:
           git remote add gh https://$GITHUB_ACTOR:$GIT_TOKEN@github.com/$GITHUB_REPOSITORY.git
           git push -f gh PathOfBuilding
           git remote remove gh
-        if: github.ref == 'refs/heads/master'
       - name: Upload Linux artifacts into Github
+        if: github.ref == 'refs/heads/master'
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "PathOfBuilding.linux.tar.xz"
+          artifacts: "PathOfBuilding.linux.amd64.tar.xz"
           token: ${{ secrets.GITHUB_TOKEN }}
-          allowUpdates: true
+          removeArtifacts: true
           tag: PathOfBuilding
           body: "${{steps.time.outputs.time}}"
-        if: github.ref == 'refs/heads/master'
-  build-macos:
-    runs-on: macos-latest
+  build-macos-amd64:
+    runs-on: macos-12
     steps:
       - id: time
         run: |
@@ -70,19 +67,18 @@ jobs:
           echo "time=${time}" >> $GITHUB_OUTPUT
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
-      - run: brew install make ninja
-      - run: make -f Makefile.darwin clean
-      - run: make -f Makefile.darwin tools
-      - run: make -f Makefile.darwin
+      - run: brew install make
+      - run: make
       - name: Package tar.xz archive
-        run: tar -cf - PathOfBuilding.app | xz -c > PathOfBuilding.darwin.tar.xz
+        run: tar -cf - PathOfBuilding.app | xz -c > PathOfBuilding.darwin.amd64.tar.xz
       - name: Cheking GUI 
         env:
           IMGUR_CLIENT_ID: ${{ secrets.IMGUR_CLIENT_ID }}
           GIT_TOKEN: ${{ secrets.GIT_TOKEN }} 
+        if: github.ref != 'refs/heads/master'
         run: |
             ./PathOfBuilding.app/Contents/MacOS/pobWrapper.sh &
-            sleep 10
+            sleep 15
             screencapture /tmp/sl.png
             export IMG_URL=`curl -L -X POST https://api.imgur.com/3/image -H "Authorization: Client-ID ${IMGUR_CLIENT_ID}" -F image=@/tmp/sl.png | jq '.data | .link' | tr -d '"'`
             pull_number=$(jq --raw-output .pull_request.number "$GITHUB_EVENT_PATH")
@@ -91,15 +87,14 @@ jobs:
               https://api.github.com/repos/aspel/pobfrontend/issues/${pull_number}/comments \
               -d "{\"body\":\"![Screenshot MacOS](${IMG_URL})\n${GITHUB_SHA} : MacOS\"}"
             echo $IMG_URL
-        if: github.ref != 'refs/heads/master'
-      - run: tar -tvf PathOfBuilding.darwin.tar.xz
+      - run: tar -tvf PathOfBuilding.darwin.amd64.tar.xz
       - name: Upload MacOS artifacts into Github
+        if: github.ref == 'refs/heads/master'
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "PathOfBuilding.darwin.tar.xz"
+          artifacts: "PathOfBuilding.darwin.amd64.tar.xz"
           token: ${{ secrets.GITHUB_TOKEN }}
-          allowUpdates: true
+          removeArtifacts: true
           tag: PathOfBuilding
           body: "${{steps.time.outputs.time}}"
-        if: github.ref == 'refs/heads/master'
   
