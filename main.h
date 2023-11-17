@@ -34,7 +34,6 @@ enum r_texFlag_e {
 
 class Cmd {
   public:
-    virtual ~Cmd() = default;
     virtual void execute() = 0;
 };
 
