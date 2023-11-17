@@ -36,8 +36,8 @@ luacurl:
 tools: qt lua zlib meson
 
 qt:
-	sudo apt -y install qt5-default; \
-	sudo apt -y install qtcreator
+	sudo apt -y install qtbase5-dev qt5-qmake \
+	qtcreator
 
 lua:
 	sudo apt -y install luajit; \
