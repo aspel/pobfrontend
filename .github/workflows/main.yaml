@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: make
       - name: Package tar.xz archive
-        run: tar -cf - -C ${GITHUB_WORKSPACE}/PathOfBuilding $(ls -A ${GITHUB_WORKSPACE}"/PathOfBuilding") | xz -c > PathOfBuilding.linux.amd64.tar.xz
+        run: tar -cf - -C ${GITHUB_WORKSPACE}/linux $(ls -A ${GITHUB_WORKSPACE}"/linux") | xz -c > PathOfBuilding.linux.amd64.tar.xz
       - name: Cheking GUI 
         env:
           IMGUR_CLIENT_ID: ${{ secrets.IMGUR_CLIENT_ID }}
@@ -25,7 +25,7 @@ jobs:
           DISPLAY: :10
         if: github.ref != 'refs/heads/master'
         run: |
-            pushd ${GITHUB_WORKSPACE}/PathOfBuilding
+            pushd ${GITHUB_WORKSPACE}/linux
             Xvfb :10 -screen 0 1024x768x24 &
             sleep 15
             ./PathOfBuilding &

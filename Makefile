@@ -19,9 +19,9 @@ Darwin: pob
 	echo "Finished $(OS_NAME)"
 
 Linux: pob
-	meson setup --buildtype=release build
+	meson setup --buildtype=release --prefix=${DIR}/linux --bindir='' build
 	meson compile -C build
-	mv build/PathOfBuilding PathOfBuilding/
+	meson install -C build
 	echo "Finished $(OS_NAME)"
 
 pob: clear tools_$(OS_NAME) load_pob luacurl
