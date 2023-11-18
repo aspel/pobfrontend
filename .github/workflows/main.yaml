@@ -55,7 +55,7 @@ jobs:
         with:
           artifacts: "PathOfBuilding.linux.amd64.tar.xz"
           token: ${{ secrets.GITHUB_TOKEN }}
-          removeArtifacts: true
+          allowUpdates: true
           tag: PathOfBuilding
           body: "${{steps.time.outputs.time}}"
   build-macos-amd64:
@@ -94,7 +94,7 @@ jobs:
         with:
           artifacts: "PathOfBuilding.darwin.amd64.tar.xz"
           token: ${{ secrets.GITHUB_TOKEN }}
-          removeArtifacts: true
+          allowUpdates: true
           tag: PathOfBuilding
           body: "${{steps.time.outputs.time}}"
   
