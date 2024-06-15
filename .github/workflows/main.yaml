@@ -14,10 +14,14 @@ jobs:
         run: |
           time=nightly-$(date +'%Y/%m/%d')
           echo "time=${time}" >> $GITHUB_OUTPUT
+
       - uses: actions/checkout@v4
+
       - run: make
+
       - name: Package tar.xz archive
         run: tar -cf - -C ${GITHUB_WORKSPACE}/linux $(ls -A ${GITHUB_WORKSPACE}"/linux") | xz -c > PathOfBuilding.linux.amd64.tar.xz
+
       - name: Cheking GUI 
         env:
           IMGUR_CLIENT_ID: ${{ secrets.IMGUR_CLIENT_ID }}
@@ -39,7 +43,9 @@ jobs:
               -d "{\"body\":\"![Screenshot Linux](${IMG_URL})\n${GITHUB_SHA} : Linux amd64\"}"
             popd
             echo $IMG_URL
+
       - run: tar -tvf PathOfBuilding.linux.amd64.tar.xz
+
       - name: Update release tag
         if: github.ref == 'refs/heads/master'
         run: |
@@ -49,6 +55,7 @@ jobs:
           git remote add gh https://$GITHUB_ACTOR:$GIT_TOKEN@github.com/$GITHUB_REPOSITORY.git
           git push -f gh PathOfBuilding
           git remote remove gh
+
       - name: Upload Linux artifacts into Github
         if: github.ref == 'refs/heads/master'
         uses: ncipollo/release-action@v1
@@ -58,6 +65,7 @@ jobs:
           allowUpdates: true
           tag: PathOfBuilding
           body: "${{steps.time.outputs.time}}"
+
   build-macos-amd64:
     runs-on: macos-13
     steps:
@@ -65,12 +73,20 @@ jobs:
         run: |
           time=nightly-$(date +'%Y/%m/%d')
           echo "time=${time}" >> $GITHUB_OUTPUT
+
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
+
       - run: brew install make
+
       - run: make
+
       - name: Package tar.xz archive
-        run: tar --exclude='PathOfBuilding.app/Contents/MacOS/spec' -cf - PathOfBuilding.app | xz -c > PathOfBuilding.darwin.amd64.tar.xz
+        run: |
+          rm -rf PathOfBuilding.app/Contents/MacOS/spec
+          codesign --force --deep --sign - PathOfBuilding.app
+          tar -cf - PathOfBuilding.app | xz -c > PathOfBuilding.darwin.amd64.tar.xz
+
       - name: Cheking GUI 
         env:
           IMGUR_CLIENT_ID: ${{ secrets.IMGUR_CLIENT_ID }}
@@ -87,7 +103,9 @@ jobs:
               https://api.github.com/repos/aspel/pobfrontend/issues/${pull_number}/comments \
               -d "{\"body\":\"![Screenshot MacOS](${IMG_URL})\n${GITHUB_SHA} : MacOS amd64\"}"
             echo $IMG_URL
+
       - run: tar -tvf PathOfBuilding.darwin.amd64.tar.xz
+
       - name: Upload MacOS artifacts into Github
         if: github.ref == 'refs/heads/master'
         uses: ncipollo/release-action@v1
@@ -105,12 +123,20 @@ jobs:
         run: |
           time=nightly-$(date +'%Y/%m/%d')
           echo "time=${time}" >> $GITHUB_OUTPUT
+      
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
+      
       - run: brew install make
+      
       - run: make
+
       - name: Package tar.xz archive
-        run: tar --exclude='PathOfBuilding.app/Contents/MacOS/spec' -cf - PathOfBuilding.app | xz -c > PathOfBuilding.darwin.arm64.tar.xz
+        run: |
+          rm -rf PathOfBuilding.app/Contents/MacOS/spec
+          codesign --force --deep --sign - PathOfBuilding.app
+          tar -cf - PathOfBuilding.app | xz -c > PathOfBuilding.darwin.arm64.tar.xz
+
       - name: Cheking GUI 
         env:
           IMGUR_CLIENT_ID: ${{ secrets.IMGUR_CLIENT_ID }}
@@ -127,7 +153,9 @@ jobs:
               https://api.github.com/repos/aspel/pobfrontend/issues/${pull_number}/comments \
               -d "{\"body\":\"![Screenshot MacOS](${IMG_URL})\n${GITHUB_SHA} : MacOS arm64\"}"
             echo $IMG_URL
+
       - run: tar -tvf PathOfBuilding.darwin.arm64.tar.xz
+
       - name: Upload MacOS artifacts into Github
         if: github.ref == 'refs/heads/master'
         uses: ncipollo/release-action@v1
