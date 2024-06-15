@@ -70,7 +70,7 @@ jobs:
       - run: brew install make
       - run: make
       - name: Package tar.xz archive
-        run: tar -cf - PathOfBuilding.app | xz -c > PathOfBuilding.darwin.amd64.tar.xz
+        run: tar --exclude='PathOfBuilding.app/Contents/MacOS/spec' -cf - PathOfBuilding.app | xz -c > PathOfBuilding.darwin.amd64.tar.xz
       - name: Cheking GUI 
         env:
           IMGUR_CLIENT_ID: ${{ secrets.IMGUR_CLIENT_ID }}
@@ -110,7 +110,7 @@ jobs:
       - run: brew install make
       - run: make
       - name: Package tar.xz archive
-        run: tar -cf - PathOfBuilding.app | xz -c > PathOfBuilding.darwin.arm64.tar.xz
+        run: tar --exclude='PathOfBuilding.app/Contents/MacOS/spec' -cf - PathOfBuilding.app | xz -c > PathOfBuilding.darwin.arm64.tar.xz
       - name: Cheking GUI 
         env:
           IMGUR_CLIENT_ID: ${{ secrets.IMGUR_CLIENT_ID }}
