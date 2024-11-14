@@ -16,8 +16,7 @@ Darwin_arm64: pob
 	meson setup --buildtype=release --prefix=${DIR}/PathOfBuilding.app --bindir=Contents/MacOS build
 	meson compile -C build
 	meson install -C build
-	/opt/homebrew/opt/qt@5/bin/macdeployqt ${DIR}/PathOfBuilding.app
-	cp ${DIR}/Info.plist.sh ${DIR}/PathOfBuilding.app/Contents/Info.plist
+	/opt/homebrew/opt/qt@5/bin/macdeployqt ${DIR}/PathOfBuilding.app -verbose=2
 	echo "Finished $(OS_NAME)"
 
 Darwin_x86_64: pob
@@ -27,8 +26,7 @@ Darwin_x86_64: pob
 	meson setup --buildtype=release --prefix=${DIR}/PathOfBuilding.app --bindir=Contents/MacOS build
 	meson compile -C build
 	meson install -C build
-	/usr/local/opt/qt@5/bin/macdeployqt ${DIR}/PathOfBuilding.app
-	cp ${DIR}/Info.plist.sh ${DIR}/PathOfBuilding.app/Contents/Info.plist
+	/usr/local/opt/qt@5/bin/macdeployqt ${DIR}/PathOfBuilding.app -verbose=2 
 	echo "Finished $(OS_NAME)"
 
 Linux_x86_64: pob
