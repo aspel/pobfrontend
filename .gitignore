@@ -1,6 +1,7 @@
 lcurl.so
 Lua-cURLv3
 PathOfBuilding
+PathOfBuilding.app
 build
 *.so
 *.dll

@@ -103,7 +103,7 @@ class DrawStringCmd : public DrawImageQuadCmd {
         col[3] = 1.0f;
     }
   private:
-    float col[4];
+    float col[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     QString text;
 };
 #endif
