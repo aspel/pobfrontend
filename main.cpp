@@ -29,6 +29,74 @@ POBWindow *pobwindow;
 
 QRegularExpression colourCodes{R"((\^x.{6})|(\^\d))"};
 
+static void reportLuaCallbackError(const char* context) {
+    const char* err = lua_tostring(L, -1);
+    std::cerr << "Lua callback error (" << context << "): "
+              << (err ? err : "unknown") << std::endl;
+    lua_pop(L, 1);
+}
+
+static QString fixedFontFamily() {
+#ifdef __APPLE__
+    QFontDatabase db;
+    if (db.families().contains("SF Mono")) {
+        return "SF Mono";
+    }
+    if (db.families().contains("Menlo")) {
+        return "Menlo";
+    }
+    return "Monospace";
+#else
+    QFontDatabase db;
+    if (db.families().contains("Bitstream Vera Sans Mono")) {
+        return "Bitstream Vera Sans Mono";
+    }
+    if (db.families().contains("Bitstream Vera Mono")) {
+        return "Bitstream Vera Mono";
+    }
+    return "Monospace";
+#endif
+}
+
+static QString varFontFamily() {
+#ifdef __APPLE__
+    QFontDatabase db;
+    if (db.families().contains("SF Pro Text")) {
+        return "SF Pro Text";
+    }
+    if (db.families().contains(".AppleSystemUIFont")) {
+        return ".AppleSystemUIFont";
+    }
+    return "Helvetica";
+#else
+    return "Liberation Sans";
+#endif
+}
+
+static QString varBoldFontFamily() {
+#ifdef __APPLE__
+    return varFontFamily();
+#else
+    return "Liberation Sans Bold";
+#endif
+}
+
+static int adjustedPixelSize(int px, bool isFixed) {
+    (void)isFixed;
+#ifdef __APPLE__
+    return px;
+#else
+    return px;
+#endif
+}
+
+static void applyFontRenderingSettings(QFont& font) {
+#ifdef __APPLE__
+    font.setStyleStrategy(QFont::PreferAntialias);
+    font.setHintingPreference(QFont::PreferFullHinting);
+#endif
+}
+
 void pushCallback(const char* name) {
     lua_getfield(L, LUA_REGISTRYINDEX, "uicallbacks");
     lua_getfield(L, -1, "MainObject");
@@ -68,7 +136,9 @@ void POBWindow::paintGL() {
     pushCallback("OnFrame");
     int result = lua_pcall(L, 1, 0, 0);
     if (result != 0) {
-        lua_error(L);
+        reportLuaCallbackError("OnFrame");
+        isDrawing = false;
+        return;
     }
 
     // Hack: PoB doesn't recalculate stats until the frame _after_ some changes (e.g. config). Just call OnFrame twice.
@@ -80,7 +150,9 @@ void POBWindow::paintGL() {
     pushCallback("OnFrame");
     result = lua_pcall(L, 1, 0, 0);
     if (result != 0) {
-        lua_error(L);
+        reportLuaCallbackError("OnFrame");
+        isDrawing = false;
+        return;
     }
 
     if (dscount > pobwindow->stringCache.maxCost()) {
@@ -139,7 +211,8 @@ void POBWindow::mousePressEvent(QMouseEvent *event) {
     lua_pushboolean(L, false);
     int result = lua_pcall(L, 3, 0, 0);
     if (result != 0) {
-        lua_error(L);
+        reportLuaCallbackError("OnKeyDown(mouse)");
+        return;
     }
     update();
 }
@@ -149,7 +222,8 @@ void POBWindow::mouseReleaseEvent(QMouseEvent *event) {
     pushMouseString(event);
     int result = lua_pcall(L, 2, 0, 0);
     if (result != 0) {
-        lua_error(L);
+        reportLuaCallbackError("OnKeyUp(mouse)");
+        return;
     }
     update();
 }
@@ -160,7 +234,8 @@ void POBWindow::mouseDoubleClickEvent(QMouseEvent *event) {
     lua_pushboolean(L, true);
     int result = lua_pcall(L, 3, 0, 0);
     if (result != 0) {
-        lua_error(L);
+        reportLuaCallbackError("OnKeyDown(doubleclick)");
+        return;
     }
     update();
 }
@@ -177,7 +252,8 @@ void POBWindow::wheelEvent(QWheelEvent *event) {
     lua_pushboolean(L, false);
     int result = lua_pcall(L, 3, 0, 0);
     if (result != 0) {
-        lua_error(L);
+        reportLuaCallbackError("OnKeyUp(wheel)");
+        return;
     }
     update();
 }
@@ -254,7 +330,8 @@ void POBWindow::keyPressEvent(QKeyEvent *event) {
     lua_pushboolean(L, false);
     int result = lua_pcall(L, 3, 0, 0);
     if (result != 0) {
-        lua_error(L);
+        reportLuaCallbackError("OnKeyDown(keypress)");
+        return;
     }
     update();
 }
@@ -267,7 +344,8 @@ void POBWindow::keyReleaseEvent(QKeyEvent *event) {
     }
     int result = lua_pcall(L, 2, 0, 0);
     if (result != 0) {
-        lua_error(L);
+        reportLuaCallbackError("OnKeyUp(keyrelease)");
+        return;
     }
     update();
 }
@@ -769,7 +847,7 @@ static int l_DrawImageQuad(lua_State* L)
 
 DrawStringCmd::DrawStringCmd(float X, float Y, int Align, int Size, int Font, const char *Text) : text(Text) {
     dscount++;
-    if (text[0] == '^') {
+    if (!text.isEmpty() && text[0] == '^' && text.size() > 1) {
         switch(text[1].toLatin1()) {
         case '0':
             setCol(0.0f, 0.0f, 0.0f);
@@ -810,7 +888,13 @@ DrawStringCmd::DrawStringCmd(float X, float Y, int Align, int Size, int Font, co
             break;
         }
     } else {
-        col[3] = 0;
+        col[0] = pobwindow->drawColor[0];
+        col[1] = pobwindow->drawColor[1];
+        col[2] = pobwindow->drawColor[2];
+        col[3] = pobwindow->drawColor[3];
+        if (col[3] <= 0.0f) {
+            setCol(1.0f, 1.0f, 1.0f);
+        }
     }
     int count = 0;
     for (auto i = colourCodes.globalMatch(text);i.hasNext();i.next()) {
@@ -826,20 +910,43 @@ DrawStringCmd::DrawStringCmd(float X, float Y, int Align, int Size, int Font, co
         tex = *pobwindow->stringCache[cacheKey];
     } else {
         QString fontName;
+        bool italic = false;
+        bool bold = false;
+        bool condensed = false;
+        bool isFixed = false;
         switch (Font) {
         case 1:
-            fontName = "Liberation Sans";
+        case 3: // FONTIN
+        case 4: // FONTIN SC
+            fontName = varFontFamily();
+            condensed = true;
             break;
         case 2:
-            fontName = "Liberation Sans Bold";
+            fontName = varBoldFontFamily();
+            bold = true;
+            condensed = true;
+            break;
+        case 5: // FONTIN ITALIC
+            fontName = varFontFamily();
+            italic = true;
+            condensed = true;
             break;
         case 0:
         default:
-            fontName = "Bitstream Vera Mono";
+            fontName = fixedFontFamily();
+            isFixed = true;
             break;
         }
         QFont font(fontName);
-        font.setPixelSize(Size + pobwindow->fontFudge);
+        applyFontRenderingSettings(font);
+        font.setItalic(italic);
+        font.setBold(bold);
+#ifdef __APPLE__
+        if (condensed) {
+            font.setStretch(QFont::SemiCondensed);
+        }
+#endif
+        font.setPixelSize(adjustedPixelSize(Size + pobwindow->fontFudge, isFixed));
         QFontMetrics fm(font);
         QSize size = fm.size(0, text);
 
@@ -850,6 +957,7 @@ DrawStringCmd::DrawStringCmd(float X, float Y, int Align, int Size, int Font, co
             QPainter p(&brush);
             p.setPen(QColor(255, 255, 255, 255));
             p.setFont(font);
+            p.setRenderHint(QPainter::TextAntialiasing, true);
             p.setCompositionMode(QPainter::CompositionMode_Plus);
             p.drawText(0, 0, size.width(), size.height(), 0, text);
             p.end();
@@ -909,7 +1017,7 @@ static int l_DrawString(lua_State* L)
     pobwindow->LAssert(L, lua_isstring(L, 5), "DrawString() argument 5: expected string, got %t", 5);
     pobwindow->LAssert(L, lua_isstring(L, 6), "DrawString() argument 6: expected string, got %t", 6);
     static const char* alignMap[6] = { "LEFT", "CENTER", "RIGHT", "CENTER_X", "RIGHT_X", nullptr };
-    static const char* fontMap[4] = { "FIXED", "VAR", "VAR BOLD", nullptr };
+    static const char* fontMap[] = { "FIXED", "VAR", "VAR BOLD", "FONTIN", "FONTIN SC", "FONTIN ITALIC", nullptr };
     pobwindow->AppendCmd(std::shared_ptr<Cmd>(new DrawStringCmd(
         (float)lua_tonumber(L, 1), (float)lua_tonumber(L, 2), luaL_checkoption(L, 3, "LEFT", alignMap), 
         (int)lua_tointeger(L, 4), luaL_checkoption(L, 5, "FIXED", fontMap), lua_tostring(L, 6)
@@ -926,15 +1034,32 @@ static int l_DrawStringWidth(lua_State* L)
     pobwindow->LAssert(L, lua_isstring(L, 3), "DrawStringWidth() argument 3: expected string, got %t", 3);
     int fontsize = lua_tointeger(L, 1);
     QString fontName = lua_tostring(L, 2);
+    bool italic = false;
+    bool bold = false;
+    bool condensed = false;
+    bool isFixed = false;
     QString fontKey = "0";
     if (fontName == "VAR") {
-        fontName = "Liberation Sans";
+        fontName = varFontFamily();
         fontKey = "1";
+        condensed = true;
     } else if (fontName == "VAR BOLD") {
-        fontName = "Liberation Sans Bold";
+        fontName = varBoldFontFamily();
         fontKey = "2";
+        bold = true;
+        condensed = true;
+    } else if (fontName == "FONTIN" || fontName == "FONTIN SC") {
+        fontName = varFontFamily();
+        fontKey = "3";
+        condensed = true;
+    } else if (fontName == "FONTIN ITALIC") {
+        fontName = varFontFamily();
+        italic = true;
+        fontKey = "4";
+        condensed = true;
     } else {
-        fontName = "Bitstream Vera Mono";
+        fontName = fixedFontFamily();
+        isFixed = true;
     }
     QString text(lua_tostring(L, 3));
 
@@ -947,7 +1072,15 @@ static int l_DrawStringWidth(lua_State* L)
     }
 
     QFont font(fontName);
-    font.setPixelSize(fontsize + pobwindow->fontFudge);
+    applyFontRenderingSettings(font);
+    font.setItalic(italic);
+    font.setBold(bold);
+#ifdef __APPLE__
+    if (condensed) {
+        font.setStretch(QFont::SemiCondensed);
+    }
+#endif
+    font.setPixelSize(adjustedPixelSize(fontsize + pobwindow->fontFudge, isFixed));
     QFontMetrics fm(font);
     lua_pushinteger(L, fm.size(0, text).width());
     return 1;
@@ -965,12 +1098,27 @@ static int l_DrawStringCursorIndex(lua_State* L)
 
     int fontsize = lua_tointeger(L, 1);
     QString fontName = lua_tostring(L, 2);
+    bool italic = false;
+    bool bold = false;
+    bool condensed = false;
+    bool isFixed = false;
     if (fontName == "VAR") {
-        fontName = "Liberation Sans";
+        fontName = varFontFamily();
+        condensed = true;
     } else if (fontName == "VAR BOLD") {
-        fontName = "Liberation Sans Bold";
+        fontName = varBoldFontFamily();
+        bold = true;
+        condensed = true;
+    } else if (fontName == "FONTIN" || fontName == "FONTIN SC") {
+        fontName = varFontFamily();
+        condensed = true;
+    } else if (fontName == "FONTIN ITALIC") {
+        fontName = varFontFamily();
+        italic = true;
+        condensed = true;
     } else {
-        fontName = "Bitstream Vera Mono";
+        fontName = fixedFontFamily();
+        isFixed = true;
     }
     QString text(lua_tostring(L, 3));
 
@@ -978,7 +1126,15 @@ static int l_DrawStringCursorIndex(lua_State* L)
 
     QStringList texts = text.split("\n");
     QFont font(fontName);
-    font.setPixelSize(fontsize + pobwindow->fontFudge);
+    applyFontRenderingSettings(font);
+    font.setItalic(italic);
+    font.setBold(bold);
+#ifdef __APPLE__
+    if (condensed) {
+        font.setStretch(QFont::SemiCondensed);
+    }
+#endif
+    font.setPixelSize(adjustedPixelSize(fontsize + pobwindow->fontFudge, isFixed));
     QFontMetrics fm(font);
     int curX = lua_tointeger(L, 4);
     int curY = lua_tointeger(L, 5);
@@ -1454,14 +1610,28 @@ static int l_PCall(lua_State* L)
     pobwindow->LAssert(L, n >= 1, "Usage: PCall(func[, ...])");
     pobwindow->LAssert(L, lua_isfunction(L, 1), "PCall() argument 1: expected function, got %t", 1);
     lua_getfield(L, LUA_REGISTRYINDEX, "traceback");
-    lua_insert(L, 1); // Insert traceback function at start of stack
-    int err = lua_pcall(L, n - 1, LUA_MULTRET, 1);
+    int errFuncIndex = 0;
+    if (lua_isfunction(L, -1)) {
+        lua_insert(L, 1); // Insert traceback function at start of stack
+        errFuncIndex = 1;
+    } else {
+        lua_pop(L, 1);
+    }
+    int err = lua_pcall(L, n - 1, LUA_MULTRET, errFuncIndex);
     if (err) {
-        lua_error(L);
+        // Match PoB semantics: on error return errMsg as first result.
+        if (errFuncIndex != 0) {
+            lua_remove(L, 1); // Remove traceback handler
+        }
         return 1;
     }
-    lua_pushnil(L);
-    lua_replace(L, 1); // Replace traceback function with nil
+    if (errFuncIndex != 0) {
+        lua_pushnil(L);
+        lua_replace(L, 1); // Replace traceback function with nil
+    } else {
+        lua_pushnil(L);
+        lua_insert(L, 1);
+    }
     return lua_gettop(L);
 }
 
@@ -1659,6 +1829,10 @@ int main(int argc, char **argv)
     L = luaL_newstate();
     luaL_openlibs(L);
     luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE|LUAJIT_MODE_OFF);
+    lua_getglobal(L, "debug");
+    lua_getfield(L, -1, "traceback");
+    lua_setfield(L, LUA_REGISTRYINDEX, "traceback");
+    lua_pop(L, 1);
 
     // Callbacks
     lua_newtable(L);		// Callbacks table
@@ -1777,6 +1951,9 @@ int main(int argc, char **argv)
     lua_setglobal(L, "arg");
 
     std::string basePath = pobwindow->basePath.toStdString();
+    QFontDatabase::addApplicationFont(QString::fromStdString(basePath + "/VeraMono.ttf"));
+    QFontDatabase::addApplicationFont(QString::fromStdString(basePath + "/LiberationSans-Regular.ttf"));
+    QFontDatabase::addApplicationFont(QString::fromStdString(basePath + "/LiberationSans-Bold.ttf"));
     std::string extraPathCommand = "package.path = package.path .. \";"
         + basePath
         + "/?.lua;"
@@ -1802,18 +1979,21 @@ int main(int argc, char **argv)
 
     int result = luaL_dofile(L, "Launch.lua");
     if (result != 0) {
-        lua_error(L);
+        const char* err = lua_tostring(L, -1);
+        std::cerr << "Lua startup error (Launch.lua): " << (err ? err : "unknown") << std::endl;
+        lua_pop(L, 1);
+        return 1;
     }
 
     pushCallback("OnInit");
     result = lua_pcall(L, 1, 0, 0);
     if (result != 0) {
-        lua_error(L);
+        const char* err = lua_tostring(L, -1);
+        std::cerr << "Lua startup error (OnInit): " << (err ? err : "unknown") << std::endl;
+        lua_pop(L, 1);
+        return 1;
     }
     pobwindow->resize(800, 600);
     pobwindow->show();
-    QFontDatabase::addApplicationFont("VeraMono.ttf");
-    QFontDatabase::addApplicationFont("LiberationSans-Regular.ttf");
-    QFontDatabase::addApplicationFont("LiberationSans-Bold.ttf");
     return app.exec();
 }
