@@ -576,6 +576,20 @@ static int l_GetScreenSize(lua_State* L)
     return 2;
 }
 
+static int l_GetVirtualScreenSize(lua_State* L)
+{
+    // Compatibility shim for newer PoB scripts.
+    return l_GetScreenSize(L);
+}
+
+static int l_GetVirtualScreenOffset(lua_State* L)
+{
+    // Single-window frontend: virtual origin is the primary screen origin.
+    lua_pushinteger(L, 0);
+    lua_pushinteger(L, 0);
+    return 2;
+}
+
 static int l_SetClearColor(lua_State* L)
 {
     int n = lua_gettop(L);
@@ -1681,6 +1695,8 @@ int main(int argc, char **argv)
     // Rendering
     ADDFUNC(RenderInit);
     ADDFUNC(GetScreenSize);
+    ADDFUNC(GetVirtualScreenSize);
+    ADDFUNC(GetVirtualScreenOffset);
     ADDFUNC(SetClearColor);
     ADDFUNC(SetDrawLayer);
     ADDFUNC(SetViewport);
@@ -1763,8 +1779,26 @@ int main(int argc, char **argv)
     std::string basePath = pobwindow->basePath.toStdString();
     std::string extraPathCommand = "package.path = package.path .. \";"
         + basePath
-        + "/runtime/lua/?.lua\"";
+        + "/?.lua;"
+        + basePath
+        + "/?/init.lua;"
+        + basePath
+        + "/runtime/lua/?.lua;"
+        + basePath
+        + "/runtime/lua/?/init.lua\"; "
+        "package.cpath = package.cpath .. \";"
+        + basePath
+        + "/?.so;"
+        + basePath
+        + "/runtime/lua/?.so\"";
     luaL_dostring(L, extraPathCommand.c_str());
+    luaL_dostring(L,
+        "if GetVirtualScreenSize == nil then "
+        "  function GetVirtualScreenSize() return GetScreenSize() end "
+        "end "
+        "if GetVirtualScreenOffset == nil then "
+        "  function GetVirtualScreenOffset() return 0, 0 end "
+        "end");
 
     int result = luaL_dofile(L, "Launch.lua");
     if (result != 0) {
@@ -1783,4 +1817,3 @@ int main(int argc, char **argv)
     QFontDatabase::addApplicationFont("LiberationSans-Bold.ttf");
     return app.exec();
 }
-

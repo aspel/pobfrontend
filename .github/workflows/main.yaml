@@ -1,168 +1,185 @@
 name: CI
+
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
   schedule:
-    - cron:  '30 13 * * 5'
-jobs:
-  build-linux-amd64:
-    runs-on: ubuntu-latest
-    steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - id: time
-        run: |
-          time=nightly-$(date +'%Y/%m/%d')
-          echo "time=${time}" >> $GITHUB_OUTPUT
+    - cron: "30 13 * * 5"
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+            make_target: Linux_x86_64
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            make_target: Linux_aarch64
+    runs-on: ${{ matrix.runner }}
+    env:
+      IMGUR_CLIENT_ID: ${{ secrets.IMGUR_CLIENT_ID }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
       - uses: actions/checkout@v4
+
+      - run: make "${{ matrix.make_target }}"
+
+      - name: Package tar.xz archive
+        run: tar -C "${GITHUB_WORKSPACE}/linux" -cJf "PathOfBuilding.linux.${{ matrix.arch }}.tar.xz" .
+
+      - name: Checking GUI
+        if: github.event_name == 'pull_request' && env.IMGUR_CLIENT_ID != ''
+        env:
+          IMGUR_CLIENT_ID: ${{ secrets.IMGUR_CLIENT_ID }}
+          GITHUB_TOKEN: ${{ github.token }}
+          DISPLAY: :10
+        run: |
+          set -euo pipefail
+          pushd "${GITHUB_WORKSPACE}/linux"
+          Xvfb :10 -screen 0 1024x768x24 &
+          sleep 15
+          ./PathOfBuilding &
+          sleep 10
+          xwd -root -silent -display :10 | convert xwd:- png:/tmp/sl.png
+          IMG_URL=$(curl -sS -L -X POST https://api.imgur.com/3/image \
+            -H "Authorization: Client-ID ${IMGUR_CLIENT_ID}" \
+            -F image=@/tmp/sl.png | jq -r '.data.link')
+          curl -sS -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/${{ github.event.pull_request.number }}/comments" \
+            -d "{\"body\":\"![Screenshot Linux](${IMG_URL})\n${GITHUB_SHA} : Linux ${{ matrix.arch }}\"}"
+          popd
+          echo "${IMG_URL}"
+
+      - run: tar -tvf "PathOfBuilding.linux.${{ matrix.arch }}.tar.xz"
+
+      - name: Upload Linux artifact
+        if: github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}-dist
+          path: PathOfBuilding.linux.${{ matrix.arch }}.tar.xz
+          if-no-files-found: error
+
+  build-macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: macos-15-intel
+          - arch: arm64
+            runner: macos-15
+    runs-on: ${{ matrix.runner }}
+    env:
+      IMGUR_CLIENT_ID: ${{ secrets.IMGUR_CLIENT_ID }}
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: brew install make
 
       - run: make
 
       - name: Package tar.xz archive
-        run: tar -cf - -C ${GITHUB_WORKSPACE}/linux $(ls -A ${GITHUB_WORKSPACE}"/linux") | xz -c > PathOfBuilding.linux.amd64.tar.xz
+        run: |
+          set -euo pipefail
+          rm -rf PathOfBuilding.app/Contents/MacOS/spec
+          codesign --force --deep --sign - PathOfBuilding.app
+          tar -cJf "PathOfBuilding.darwin.${{ matrix.arch }}.tar.xz" PathOfBuilding.app
 
-      - name: Cheking GUI 
+      - name: Checking GUI
+        if: github.event_name == 'pull_request' && env.IMGUR_CLIENT_ID != ''
         env:
           IMGUR_CLIENT_ID: ${{ secrets.IMGUR_CLIENT_ID }}
-          GIT_TOKEN: ${{ secrets.GIT_TOKEN }} 
-          DISPLAY: :10
-        if: github.ref != 'refs/heads/master'
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-            pushd ${GITHUB_WORKSPACE}/linux
-            Xvfb :10 -screen 0 1024x768x24 &
-            sleep 15
-            ./PathOfBuilding &
-            sleep 10
-            xwd -root -silent -display :10 | convert xwd:- png:/tmp/sl.png
-            export IMG_URL=`curl -L -X POST https://api.imgur.com/3/image -H "Authorization: Client-ID ${IMGUR_CLIENT_ID}" -F image=@/tmp/sl.png | jq '.data | .link' | tr -d '"'`
-            pull_number=$(jq --raw-output .pull_request.number "$GITHUB_EVENT_PATH")
-            curl -X POST -H "Accept: application/vnd.github.v3+json" \
-              -H "Authorization: token ${GIT_TOKEN}" \
-              https://api.github.com/repos/aspel/pobfrontend/issues/${pull_number}/comments \
-              -d "{\"body\":\"![Screenshot Linux](${IMG_URL})\n${GITHUB_SHA} : Linux amd64\"}"
-            popd
-            echo $IMG_URL
+          set -euo pipefail
+          ./PathOfBuilding.app/Contents/MacOS/pobWrapper.sh &
+          sleep 15
+          screencapture /tmp/sl.png
+          IMG_URL=$(curl -sS -L -X POST https://api.imgur.com/3/image \
+            -H "Authorization: Client-ID ${IMGUR_CLIENT_ID}" \
+            -F image=@/tmp/sl.png | jq -r '.data.link')
+          curl -sS -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/${{ github.event.pull_request.number }}/comments" \
+            -d "{\"body\":\"![Screenshot MacOS](${IMG_URL})\n${GITHUB_SHA} : MacOS ${{ matrix.arch }}\"}"
+          echo "${IMG_URL}"
 
-      - run: tar -tvf PathOfBuilding.linux.amd64.tar.xz
+      - run: tar -tvf "PathOfBuilding.darwin.${{ matrix.arch }}.tar.xz"
+
+      - name: Upload MacOS artifact
+        if: github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}-dist
+          path: PathOfBuilding.darwin.${{ matrix.arch }}.tar.xz
+          if-no-files-found: error
+
+  release:
+    if: github.ref == 'refs/heads/master'
+    needs:
+      - build-linux
+      - build-macos
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - id: time
+        run: |
+          time=nightly-$(date +'%Y/%m/%d')
+          echo "time=${time}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: "*-dist"
+          merge-multiple: true
+
+      - name: Show release artifacts
+        run: ls -lh *.tar.xz
 
       - name: Update release tag
-        if: github.ref == 'refs/heads/master'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           git config --local user.name "${GITHUB_ACTOR}"
-          git config --local user.email "aspellip@gmail.com"
-          git tag -f PathOfBuilding
-          git remote add gh https://$GITHUB_ACTOR:$GIT_TOKEN@github.com/$GITHUB_REPOSITORY.git
-          git push -f gh PathOfBuilding
-          git remote remove gh
+          git config --local user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+          git tag -f PathOfBuilding "${GITHUB_SHA}"
+          git push --force origin refs/tags/PathOfBuilding
 
-      - name: Upload Linux artifacts into Github
-        if: github.ref == 'refs/heads/master'
+      - name: Upload release artifacts
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "PathOfBuilding.linux.amd64.tar.xz"
-          token: ${{ secrets.GITHUB_TOKEN }}
+          artifacts: "*.tar.xz"
+          token: ${{ github.token }}
           allowUpdates: true
+          replacesArtifacts: true
           tag: PathOfBuilding
-          body: "${{steps.time.outputs.time}}"
-
-  build-macos-amd64:
-    runs-on: macos-13
-    steps:
-      - id: time
-        run: |
-          time=nightly-$(date +'%Y/%m/%d')
-          echo "time=${time}" >> $GITHUB_OUTPUT
-
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
-
-      - run: brew install make
-
-      - run: make
-
-      - name: Package tar.xz archive
-        run: |
-          rm -rf PathOfBuilding.app/Contents/MacOS/spec
-          codesign --force --deep --sign - PathOfBuilding.app
-          tar -cf - PathOfBuilding.app | xz -c > PathOfBuilding.darwin.amd64.tar.xz
-
-      - name: Cheking GUI 
-        env:
-          IMGUR_CLIENT_ID: ${{ secrets.IMGUR_CLIENT_ID }}
-          GIT_TOKEN: ${{ secrets.GIT_TOKEN }} 
-        if: github.ref != 'refs/heads/master'
-        run: |
-            ./PathOfBuilding.app/Contents/MacOS/pobWrapper.sh &
-            sleep 15
-            screencapture /tmp/sl.png
-            export IMG_URL=`curl -L -X POST https://api.imgur.com/3/image -H "Authorization: Client-ID ${IMGUR_CLIENT_ID}" -F image=@/tmp/sl.png | jq '.data | .link' | tr -d '"'`
-            pull_number=$(jq --raw-output .pull_request.number "$GITHUB_EVENT_PATH")
-            curl -X POST -H "Accept: application/vnd.github.v3+json" \
-              -H "Authorization: token ${GIT_TOKEN}" \
-              https://api.github.com/repos/aspel/pobfrontend/issues/${pull_number}/comments \
-              -d "{\"body\":\"![Screenshot MacOS](${IMG_URL})\n${GITHUB_SHA} : MacOS amd64\"}"
-            echo $IMG_URL
-
-      - run: tar -tvf PathOfBuilding.darwin.amd64.tar.xz
-
-      - name: Upload MacOS artifacts into Github
-        if: github.ref == 'refs/heads/master'
-        uses: ncipollo/release-action@v1
-        with:
-          artifacts: "PathOfBuilding.darwin.amd64.tar.xz"
-          token: ${{ secrets.GITHUB_TOKEN }}
-          allowUpdates: true
-          tag: PathOfBuilding
-          body: "${{steps.time.outputs.time}}"
-  
-  build-macos-arm64:
-    runs-on: macos-latest
-    steps:
-      - id: time
-        run: |
-          time=nightly-$(date +'%Y/%m/%d')
-          echo "time=${time}" >> $GITHUB_OUTPUT
-      
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
-      
-      - run: brew install make
-      
-      - run: make
-
-      - name: Package tar.xz archive
-        run: |
-          rm -rf PathOfBuilding.app/Contents/MacOS/spec
-          codesign --force --deep --sign - PathOfBuilding.app
-          tar -cf - PathOfBuilding.app | xz -c > PathOfBuilding.darwin.arm64.tar.xz
-
-      - name: Cheking GUI 
-        env:
-          IMGUR_CLIENT_ID: ${{ secrets.IMGUR_CLIENT_ID }}
-          GIT_TOKEN: ${{ secrets.GIT_TOKEN }} 
-        if: github.ref != 'refs/heads/master'
-        run: |
-            ./PathOfBuilding.app/Contents/MacOS/pobWrapper.sh &
-            sleep 15
-            screencapture /tmp/sl.png
-            export IMG_URL=`curl -L -X POST https://api.imgur.com/3/image -H "Authorization: Client-ID ${IMGUR_CLIENT_ID}" -F image=@/tmp/sl.png | jq '.data | .link' | tr -d '"'`
-            pull_number=$(jq --raw-output .pull_request.number "$GITHUB_EVENT_PATH")
-            curl -X POST -H "Accept: application/vnd.github.v3+json" \
-              -H "Authorization: token ${GIT_TOKEN}" \
-              https://api.github.com/repos/aspel/pobfrontend/issues/${pull_number}/comments \
-              -d "{\"body\":\"![Screenshot MacOS](${IMG_URL})\n${GITHUB_SHA} : MacOS arm64\"}"
-            echo $IMG_URL
-
-      - run: tar -tvf PathOfBuilding.darwin.arm64.tar.xz
-
-      - name: Upload MacOS artifacts into Github
-        if: github.ref == 'refs/heads/master'
-        uses: ncipollo/release-action@v1
-        with:
-          artifacts: "PathOfBuilding.darwin.arm64.tar.xz"
-          token: ${{ secrets.GITHUB_TOKEN }}
-          allowUpdates: true
-          tag: PathOfBuilding
-          body: "${{steps.time.outputs.time}}"
+          body: "${{ steps.time.outputs.time }}"
   
